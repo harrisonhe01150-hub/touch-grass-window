@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+# Everything in data/ is either re-downloadable or personal (your labels never leave your machine).
+data/*
+!data/spots.example.json
+!data/free_hours.example.json
