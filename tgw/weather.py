@@ -70,7 +70,7 @@ def forecast(offline: bool = False) -> tuple[pd.DataFrame, dict]:
                 params={
                     "latitude": LAT,
                     "longitude": LON,
-                    "hourly": ",".join(HOURLY + ["precipitation_probability"]),
+                    "hourly": ",".join(HOURLY + ["precipitation_probability", "weather_code"]),
                     "daily": "sunrise,sunset",
                     "timezone": TZ,
                     "forecast_days": 7,
@@ -88,7 +88,9 @@ def forecast(offline: bool = False) -> tuple[pd.DataFrame, dict]:
         if not cache.exists():
             raise RuntimeError("No internet and no cached forecast yet. Run once online first.")
         payload = json.loads(cache.read_text())
-    df = _frame(payload["hourly"])
-    df["rain_prob"] = payload["hourly"]["precipitation_probability"]
+    hourly = dict(payload["hourly"])
+    hourly.setdefault("weather_code", [0] * len(hourly["time"]))  # older caches
+    df = _frame(hourly).rename(columns={"precipitation_probability": "rain_prob"})
+    df["thunder"] = df["weather_code"].between(95, 99)  # WMO codes 95-99: thunderstorm
     daily = {d: (sr, ss) for d, sr, ss in zip(payload["daily"]["time"], payload["daily"]["sunrise"], payload["daily"]["sunset"])}
     return df, {"daily": daily, "fetched": payload.get("fetched", "?")}

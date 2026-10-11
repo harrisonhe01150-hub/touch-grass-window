@@ -46,7 +46,10 @@ def cards(history: pd.DataFrame, n: int = 60, seed: int = 7) -> pd.DataFrame:
 
 
 def load_labels() -> pd.DataFrame:
-    return pd.read_csv(LABELS, parse_dates=["time"]) if LABELS.exists() else pd.DataFrame()
+    """One row per card; if a card was answered twice, the latest answer wins."""
+    if not LABELS.exists():
+        return pd.DataFrame()
+    return pd.read_csv(LABELS, parse_dates=["time"]).drop_duplicates("time", keep="last").reset_index(drop=True)
 
 
 def weather_app_rule(df: pd.DataFrame) -> np.ndarray:

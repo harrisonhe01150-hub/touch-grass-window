@@ -49,12 +49,17 @@ def compute() -> dict:
     model = taste.Taste(labels)
     fc, meta = weather.forecast(offline=OFFLINE)
     fc["p"] = model.p_go(fc)
-    wins = plan.windows(fc, fc["p"])
+    sunsets = {d: ss for d, (_, ss) in meta["daily"].items()}
+    wins = plan.windows(fc, fc["p"], sunsets)
     left_cache = taste.DATA / "left.json"
-    key = f"{date.today()}:{len(labels)}"
+    key = f"v2:{date.today()}:{len(labels)}:{int(labels['go'].sum())}"
     left = json.loads(left_cache.read_text()) if left_cache.exists() else {}
     if left.get("key") != key:
-        left = {"key": key, **plan.good_days_left(hist, model)}
+        left = {
+            "key": key,
+            **plan.good_days_left(hist, model.p_go),
+            "generic": plan.good_days_left(hist, taste.weather_app_rule),
+        }
         left_cache.write_text(json.dumps(left))
     ev_file = taste.DATA / "eval.json"
     ev = json.loads(ev_file.read_text()) if ev_file.exists() else {}
@@ -62,7 +67,8 @@ def compute() -> dict:
         ev = taste.evaluate(labels)
     today = date.today().isoformat()
     todays = [w for w in wins if w["date"] == today]
-    best = max(todays or wins, key=lambda w: w["hours"] * w["p"]) if wins else None
+    # The soonest real window (today's first); a nudge about Thursday is easy to ignore on Monday.
+    best = next((w for w in (todays or wins) if w["hours"] >= 1), None) or (wins[0] if wins else None)
     sunset = meta["daily"].get(today, (None, None))[1]
     facts = {
         "now": datetime.now().strftime("%a %b %d %H:%M"),
@@ -70,13 +76,15 @@ def compute() -> dict:
         "best_window": best,
         "best_window_is_today": bool(todays),
         "other_windows_this_week": [w for w in wins if w is not best][:4],
+        "week_by_day": plan.week(fc, fc["p"]),
         "good_days_left": {
-            "meaning": "typical-year average number of days from tomorrow to Dec 31 with 2+ hours this person would go out in (2016-2025 history)",
+            "meaning": "typical-year average number of days from tomorrow to Dec 31 with 2+ daytime hours this person would go out in (2016-2025 history)",
             "average": left["average"],
             "range": [left["min"], left["max"]],
+            "generic_average": left["generic"]["average"],
         },
     }
-    msg, source = nudge.write(facts)
+    msg, writer = nudge.write(facts)
     grid = {}
     for _, r in fc[fc["hour"].between(7, 19)].iterrows():
         grid.setdefault(r["time"].strftime("%a %d"), []).append(
@@ -84,11 +92,11 @@ def compute() -> dict:
                 "h": int(r["hour"]),
                 "p": round(float(r["p"]), 2),
                 "day": int(r["is_day"]),
-                "rain": int(r["rain_prob"]),
+                "storm": bool(r["thunder"]),
                 "tip": f"{r['time']:%a %H:00} · feels {r['feels_c']:.0f}°C · wind {r['wind_kmh']:.0f} km/h · rain {int(r['rain_prob'])}% · p(go) {r['p']:.2f}",
             }
         )
-    return {"msg": msg, "source": source, "wins": wins, "left": left, "ev": ev, "grid": grid,
+    return {"msg": msg, "writer": writer, "wins": wins, "left": left, "ev": ev, "grid": grid,
             "fetched": meta["fetched"], "n": len(labels), "yes": int(labels["go"].sum()), "offline": OFFLINE}
 
 
@@ -115,6 +123,8 @@ def label():
         row = cards.iloc[int(request.form["i"])]
         if request.form["go"] != "skip":
             new = row[["time"] + taste.FEATURES].to_frame().T.assign(go=int(request.form["go"]))
+            if len(labels):  # a double submit replaces the earlier answer instead of adding a row
+                labels = labels[labels["time"] != row["time"]]
             pd.concat([labels, new]).to_csv(taste.LABELS, index=False)
         skipped = STATE.setdefault("skipped", set())
         if request.form["go"] == "skip":
@@ -169,14 +179,15 @@ table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:8px 10px
 @media(max-width:700px){.two{grid-template-columns:1fr}.grid{grid-template-columns:52px repeat(13,1fr)}}
 </style></head><body><main>
 <h1>Touch Grass Window</h1><p class=sub>Champaign, IL · forecast {{fetched}}{% if offline %} (offline, cached){% endif %} · taste learned from {{n}} of your answers</p>
-<div class="card nudge">{{msg}}<div class=mute style="margin-top:10px">Written by {{source}} running locally via Ollama</div></div>
+<div class="card nudge">{{msg}}<div class=mute style="margin-top:10px">Written by {{writer}} running locally via Ollama</div></div>
 <h2>This week, hour by hour</h2><div class=card><div class=grid><div></div>{% for h in range(7,20) %}<div class=hdr>{{h}}</div>{% endfor %}
-{% for d, cells in grid.items() %}<div class=dl>{{d}}</div>{% for c in cells %}<div class="cell{% if not c.day %} night{% endif %}{% if c.rain >= 60 %} rain{% endif %}" title="{{c.tip}}"
+{% for d, cells in grid.items() %}<div class=dl>{{d}}</div>{% for c in cells %}<div class="cell{% if not c.day %} night{% endif %}{% if c.storm %} rain{% endif %}" title="{{c.tip}}"
 {% if c.day %}style="background:rgba(31,111,95,{{ '%.2f'|format(0.08 + 0.92*c.p) }})"{% endif %}></div>{% endfor %}{% endfor %}</div>
-<p class=mute>Darker green = more likely you'd want to be out. Hatched = dark. Dashed = 60%+ chance of rain.</p></div>
+<p class=mute>Darker green = more likely you'd want to be out. Hatched = dark. Dashed = thunderstorm risk (the only thing that overrides your taste). Hover for details.</p></div>
 <div class=two><div><h2>Your windows</h2><div class=card>{% for w in wins[:6] %}<div class=win><b>{{w.day}} {{w.start}}–{{w.end}}</b> · feels {{w.feels_c}}°C · p {{w.p}}</div>{% else %}No window clears your bar this week.{% endfor %}</div></div>
 <div><h2>Days like this left this year</h2><div class=card><div class=stat>~{{left.average}}</div>
-<div class=mute>Average number of days from tomorrow to Dec 31 with 2+ hours you'd go out in, using your taste on 2016–2025 Champaign weather (range {{left.min}}–{{left.max}}).</div></div></div></div>
+<div class=mute>Average number of days from tomorrow to Dec 31 with 2+ daytime hours you'd go out in, using your taste on 2016–2025 Champaign weather (range {{left.min}}–{{left.max}}).
+A generic "nice weather" rule would give you ~{{left.generic.average}} (range {{left.generic.min}}–{{left.generic.max}}).</div></div></div></div>
 <h2>Does it actually learn my taste?</h2><div class=card><table><tr><th>Model (5-fold CV ×3 on your {{ev.n_labels}} answers)</th><th>Accuracy</th><th>ROC AUC</th></tr>
 <tr><td>Generic "nice weather" rule (feels 15–27°C, dry, wind &lt; 25)</td><td>{{ev.weather_app_rule.acc}}</td><td>{{ev.weather_app_rule.auc}}</td></tr>
 <tr><td>Logistic regression</td><td>{{ev.logistic_regression.acc}}</td><td>{{ev.logistic_regression.auc}}</td></tr>
