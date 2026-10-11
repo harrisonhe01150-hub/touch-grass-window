@@ -1,12 +1,12 @@
 """Open weather data from Open-Meteo (CC BY 4.0). Cached on disk so the app works offline."""
 import json
 from datetime import date
-from pathlib import Path
 
 import pandas as pd
 import requests
 
-DATA = Path(__file__).resolve().parent.parent / "data"
+from tgw import DATA
+
 LAT, LON, TZ = 40.1106, -88.2272, "America/Chicago"  # Champaign-Urbana, IL
 
 HOURLY = [
@@ -54,7 +54,7 @@ def history(start: str = "2016-01-01", end: str = "2025-12-31") -> pd.DataFrame:
     )
     r.raise_for_status()
     df = _frame(r.json()["hourly"])
-    DATA.mkdir(exist_ok=True)
+    DATA.mkdir(parents=True, exist_ok=True)
     df.to_csv(cache, index=False)
     return df
 
@@ -80,7 +80,7 @@ def forecast(offline: bool = False) -> tuple[pd.DataFrame, dict]:
             r.raise_for_status()
             payload = r.json()
             payload["fetched"] = date.today().isoformat()
-            DATA.mkdir(exist_ok=True)
+            DATA.mkdir(parents=True, exist_ok=True)
             cache.write_text(json.dumps(payload))
         except requests.RequestException:
             payload = None

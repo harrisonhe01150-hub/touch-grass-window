@@ -5,7 +5,6 @@ there is no training loop and 60 examples is enough. Everything here runs on the
 """
 import json
 import warnings
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -15,7 +14,8 @@ from sklearn.model_selection import RepeatedStratifiedKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-DATA = Path(__file__).resolve().parent.parent / "data"
+from tgw import DATA
+
 LABELS = DATA / "labels.csv"
 FEATURES = ["feels_c", "temp_c", "rain_mm", "wind_kmh", "cloud_pct", "humidity_pct", "hour"]
 

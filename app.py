@@ -123,6 +123,9 @@ def label():
         return redirect(url_for("label"))
     done = set(labels["time"].astype(str)) if len(labels) else set()
     todo = [i for i, t in enumerate(cards["time"].astype(str)) if t not in done and i not in STATE.get("skipped", set())]
+    if not todo and len(labels) < 20:  # skipped too many: bring the skipped cards back instead of looping
+        STATE["skipped"] = set()
+        todo = [i for i, t in enumerate(cards["time"].astype(str)) if t not in done]
     if not todo:
         return redirect(url_for("home"))
     i = todo[0]

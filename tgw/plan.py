@@ -1,11 +1,11 @@
 """Turn hourly go-outside probabilities into concrete windows, and say how rare a good day is."""
 import json
 from datetime import date
-from pathlib import Path
 
 import pandas as pd
 
-DATA = Path(__file__).resolve().parent.parent / "data"
+from tgw import DATA
+
 GO, RAIN_RISK = 0.5, 60  # p(go) threshold; precipitation probability (%) that vetoes an hour
 
 

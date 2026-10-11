@@ -1,10 +1,10 @@
 """Gemma, running locally through Ollama, turns the numbers into one short nudge. Nothing leaves the laptop."""
 import json
-from pathlib import Path
 
 import requests
 
-DATA = Path(__file__).resolve().parent.parent / "data"
+from tgw import DATA
+
 OLLAMA = "http://127.0.0.1:11434/api/chat"
 MODEL = "gemma4:e4b"
 
