@@ -4,6 +4,7 @@ All the reasoning (which window, which spot, what changes later in the week) hap
 only has to phrase a handful of facts. That keeps it honest and keeps it fast on a laptop.
 """
 import json
+import re
 from datetime import date, timedelta
 
 import requests
@@ -23,8 +24,8 @@ DEFAULT_SPOTS = [
 SYSTEM = """You write a short nudge that gets a student outside, from the facts the user gives you.
 Write exactly 3 sentences, under 75 words, in second person. Warm and a bit dry. No exclamation marks, no markdown, at most one emoji.
 1. When to go, how it will feel, and where (the spot).
-2. Why this one counts: what happens later in the week (if given), and how many days like this are left before New Year
-   by their own taste versus what a generic weather app would say.
+2. Why this one counts: what happens later in the week (if given), then the "Why it counts" fact in your own words
+   (keep its meaning: it is how many days like this are left, not how long anything lasts).
 3. "Shoes on at <time>." using the given time, or "Shoes on now." if the time is "now".
 Use only the given facts. Do not add any other numbers, places or weather."""
 
@@ -81,36 +82,48 @@ def brief(facts: dict) -> dict | None:
         "Feels like": f"{w['feels_c']}°C, {sky}, {wind}{wet}",
         "Spot": f"{spot['name']} ({spot['note']})",
         "Later this week": coming(facts.get("week_by_day", []), w["date"]),
-        "Days like this left before New Year in a typical year, by your own taste": f"about {round(facts['good_days_left']['average'])}",
-        'What a generic "nice weather" rule would say': f"about {round(facts['good_days_left']['generic_average'])}",
+        "Why it counts": f"in a typical year you get only about {round(facts['good_days_left']['average'])} more days like this"
+        f" before New Year (a generic weather app would say about {round(facts['good_days_left']['generic_average'])},"
+        " because it doesn't know your taste)",
         "Shoes on at": w["shoes_on"],
     }
 
 
-def write(facts: dict, timeout: int = 180) -> tuple[str, str]:
-    """Returns (message, writer). Writer is the model name, or 'template' if Ollama is not running."""
+NUMBER = re.compile(r"\d+(?:[.:]\d+)?")
+
+
+def grounded(msg: str, b: dict) -> bool:
+    """Every number Gemma writes must appear in the facts, and the shoes-on time must be there."""
+    allowed = set(NUMBER.findall(" ".join(str(v) for v in b.values() if v)))
+    return set(NUMBER.findall(msg)) <= allowed and (b["Shoes on at"] == "now" or b["Shoes on at"] in msg)
+
+
+def write(facts: dict, timeout: int = 180, tries: int = 3) -> tuple[str, str]:
+    """Returns (message, writer). Writer is the model name, or 'template' if Ollama is down or never stays grounded."""
     b = brief(facts)
     if b is None:
         return "Nothing this week clears your bar. Good week for the problem set; I'll look again tomorrow.", "template"
-    try:
-        r = requests.post(
-            OLLAMA,
-            json={
-                "model": MODEL,
-                "stream": False,
-                "think": True,  # a moment of thinking makes the small model follow the facts much more closely
-                "options": {"temperature": 0.5},
-                "messages": [
-                    {"role": "system", "content": SYSTEM},
-                    {"role": "user", "content": "\n".join(f"- {k}: {v}" for k, v in b.items() if v)},
-                ],
-            },
-            timeout=timeout,
-        )
-        r.raise_for_status()
-        return r.json()["message"]["content"].strip(), MODEL
-    except (requests.RequestException, KeyError):
-        return _template(b), "template"
+    prompt = "\n".join(f"- {k}: {v}" for k, v in b.items() if v)
+    for _ in range(tries):
+        try:
+            r = requests.post(
+                OLLAMA,
+                json={
+                    "model": MODEL,
+                    "stream": False,
+                    "think": True,  # a moment of thinking makes the small model follow the facts much more closely
+                    "options": {"temperature": 0.4},
+                    "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}],
+                },
+                timeout=timeout,
+            )
+            r.raise_for_status()
+            msg = r.json()["message"]["content"].strip()
+        except (requests.RequestException, KeyError):
+            break
+        if grounded(msg, b):
+            return msg, MODEL
+    return _template(b), "template"
 
 
 def _template(b: dict) -> str:

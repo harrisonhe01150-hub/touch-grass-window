@@ -5,6 +5,8 @@ outdoor windows, and how many days like today you have left before the year ends
 
 Built in one day for the [DEV Hacktoberfest Open-Source AI Challenge, Week 1: Touch Grass](https://dev.to/challenges/hacktoberfest-week1-2026-10-05).
 
+![Demo: label a few past hours, then see this week's windows and the nudge](docs/demo.gif)
+
 ## How it works
 
 ```
@@ -28,7 +30,10 @@ Built in one day for the [DEV Hacktoberfest Open-Source AI Challenge, Week 1: To
   (`data/free_hours.json`) and rain probability under 60 %, then grouped into runs.
 - **Rarity.** The same model is run over ten Octobers-to-Decembers of real history to count, per year, the days with
   2+ hours you'd have gone out in. "About N more days like this" is a typical-year average with its range.
-- **A nudge, not a dashboard.** Gemma 4 runs locally and only rephrases computed facts. It never sees anything else.
+- **Rain is your call.** The only hard veto is a thunderstorm forecast (lightning). Everything else is your taste.
+- **A nudge, not a dashboard.** Code picks the window, the spot and what changes later in the week; Gemma 4 runs locally
+  and only phrases those facts. Every number it writes is checked against the facts, with retries, then a plain
+  template as fallback.
 
 ## Run it
 
@@ -55,7 +60,20 @@ Optional config: copy `data/free_hours.example.json` to `data/free_hours.json` (
 Repeated 5-fold cross-validation (×3) on my own labels, compared with the generic rule and logistic regression.
 The app recomputes this table on your labels (`data/eval.json`).
 
-RESULTS_TABLE
+| Model | Accuracy | ROC AUC |
+|---|---|---|
+| Generic "nice weather" rule (feels 15–27 °C, dry, wind < 25 km/h) | 0.55 | 0.61 |
+| Logistic regression | 0.79 | 0.84 |
+| **TabPFN v2** (open weights, in-context, no training loop) | **0.89** | **0.94** |
+
+60 labels (35 yes). The generic rule disagreed with me on 27 of 60 hours, and every time it was the rule saying no
+while I said yes: cold stops me, rain doesn't. With my taste, a typical year has about **29** more days like today
+after Oct 11 (range 10–42 over 2016–2025); the generic rule would count about **9** (range 2–18).
+
+## Tests
+
+`python -m pytest -q` runs the guard tests (no TabPFN or Ollama needed): double-submitted labels count once, windows end
+at sunset, thunderstorms veto, and a nudge with an invented number is rejected.
 
 ## What runs where
 

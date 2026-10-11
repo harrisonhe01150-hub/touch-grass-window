@@ -93,6 +93,7 @@ def compute() -> dict:
                 "p": round(float(r["p"]), 2),
                 "day": int(r["is_day"]),
                 "storm": bool(r["thunder"]),
+                "past": bool(r["time"] + pd.Timedelta("1h") <= pd.Timestamp.now()),
                 "tip": f"{r['time']:%a %H:00} · feels {r['feels_c']:.0f}°C · wind {r['wind_kmh']:.0f} km/h · rain {int(r['rain_prob'])}% · p(go) {r['p']:.2f}",
             }
         )
@@ -173,7 +174,7 @@ PLAN_HTML = """<!doctype html><html><head><meta charset=utf-8><meta name=viewpor
 <title>Touch Grass Window</title><style>""" + BASE_CSS + """
 .nudge{font-size:20px;line-height:1.45;border-left:5px solid var(--go)}.grid{display:grid;grid-template-columns:70px repeat(13,1fr);gap:3px;font-size:12px}
 .cell{height:30px;border-radius:5px;background:#e9ece6}.night{background:repeating-linear-gradient(45deg,#e9ece6,#e9ece6 4px,#f6f7f2 4px,#f6f7f2 8px)}
-.rain{outline:2px dashed #6b7c8f;outline-offset:-2px}.hdr{color:var(--mute);text-align:center}.dl{color:var(--mute);align-self:center}
+.rain{outline:2px dashed #6b7c8f;outline-offset:-2px}.past{opacity:.25}.hdr{color:var(--mute);text-align:center}.dl{color:var(--mute);align-self:center}
 table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}th{font-size:13px;color:var(--mute);font-weight:500}
 .stat{font-size:40px;font-weight:700;color:var(--go)}.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}.win b{color:var(--go)}
 @media(max-width:700px){.two{grid-template-columns:1fr}.grid{grid-template-columns:52px repeat(13,1fr)}}
@@ -181,9 +182,9 @@ table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:8px 10px
 <h1>Touch Grass Window</h1><p class=sub>Champaign, IL · forecast {{fetched}}{% if offline %} (offline, cached){% endif %} · taste learned from {{n}} of your answers</p>
 <div class="card nudge">{{msg}}<div class=mute style="margin-top:10px">Written by {{writer}} running locally via Ollama</div></div>
 <h2>This week, hour by hour</h2><div class=card><div class=grid><div></div>{% for h in range(7,20) %}<div class=hdr>{{h}}</div>{% endfor %}
-{% for d, cells in grid.items() %}<div class=dl>{{d}}</div>{% for c in cells %}<div class="cell{% if not c.day %} night{% endif %}{% if c.storm %} rain{% endif %}" title="{{c.tip}}"
+{% for d, cells in grid.items() %}<div class=dl>{{d}}</div>{% for c in cells %}<div class="cell{% if not c.day %} night{% endif %}{% if c.storm %} rain{% endif %}{% if c.past %} past{% endif %}" title="{{c.tip}}"
 {% if c.day %}style="background:rgba(31,111,95,{{ '%.2f'|format(0.08 + 0.92*c.p) }})"{% endif %}></div>{% endfor %}{% endfor %}</div>
-<p class=mute>Darker green = more likely you'd want to be out. Hatched = dark. Dashed = thunderstorm risk (the only thing that overrides your taste). Hover for details.</p></div>
+<p class=mute>Darker green = more likely you'd want to be out. Faded = already past. Hatched = dark. Dashed = thunderstorm risk (the only thing that overrides your taste). Hover for details.</p></div>
 <div class=two><div><h2>Your windows</h2><div class=card>{% for w in wins[:6] %}<div class=win><b>{{w.day}} {{w.start}}–{{w.end}}</b> · feels {{w.feels_c}}°C · p {{w.p}}</div>{% else %}No window clears your bar this week.{% endfor %}</div></div>
 <div><h2>Days like this left this year</h2><div class=card><div class=stat>~{{left.average}}</div>
 <div class=mute>Average number of days from tomorrow to Dec 31 with 2+ daytime hours you'd go out in, using your taste on 2016–2025 Champaign weather (range {{left.min}}–{{left.max}}).
