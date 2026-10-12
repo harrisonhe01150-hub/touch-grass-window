@@ -44,3 +44,16 @@ def test_gemma_output_with_invented_numbers_is_rejected():
     assert nudge.grounded("Go tomorrow at 10:00, it feels like 26°C. About 29 days left. Shoes on at 09:50.", b)
     assert not nudge.grounded("It lasts 40 days. Shoes on at 09:50.", b)  # 40 is not a fact
     assert not nudge.grounded("Go tomorrow, 26°C. Shoes on soon.", b)  # missing the time
+
+
+def test_example_config_files_load():
+    """Copying the example files as the README says must not crash (spots once used a key pick_spot didn't know)."""
+    import json
+    import pathlib
+    import shutil
+
+    repo = pathlib.Path(__file__).resolve().parent.parent
+    for name in ("spots", "free_hours"):
+        shutil.copy(repo / "data" / f"{name}.example.json", taste.DATA / f"{name}.json")
+    assert nudge.pick_spot({"date": "2026-10-12", "hours": 10.3})["name"]
+    assert all(isinstance(v, list) for v in json.loads((taste.DATA / "free_hours.json").read_text()).values())

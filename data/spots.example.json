@@ -1,22 +1,23 @@
 [
   {
-    "name": "Main Quad",
-    "fits": "any window, even 30 minutes",
+    "name": "the Main Quad",
+    "min_hours": 0,
     "note": "the lawn between classes"
   },
   {
-    "name": "Japan House garden and the Arboretum",
-    "fits": "1-2 hours",
+    "name": "the Japan House garden and the Arboretum",
+    "min_hours": 1.5,
     "note": "south campus, walk or bike"
   },
   {
-    "name": "Crystal Lake Park, Urbana",
-    "fits": "1-2 hours",
+    "name": "Crystal Lake Park in Urbana",
+    "min_hours": 1.5,
     "note": "lake loop, bus or bike"
   },
   {
-    "name": "Allerton Park, Monticello",
-    "fits": "half a day",
+    "name": "Allerton Park in Monticello",
+    "min_hours": 5,
+    "weekend_only": true,
     "note": "needs a car or a friend with one"
   }
 ]

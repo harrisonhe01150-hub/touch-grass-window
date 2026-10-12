@@ -194,7 +194,7 @@ A generic "nice weather" rule would give you ~{{left.generic.average}} (range {{
 <tr><td>Logistic regression</td><td>{{ev.logistic_regression.acc}}</td><td>{{ev.logistic_regression.auc}}</td></tr>
 <tr><td><b>TabPFN (open weights, in-context, no training loop)</b></td><td><b>{{ev.tabpfn.acc}}</b></td><td><b>{{ev.tabpfn.auc}}</b></td></tr></table></div>
 <form method=post action=/refresh style="margin-top:16px;display:flex;gap:10px"><button class=yes style="background:var(--go);color:#fff">Refresh</button><a href=/label style="align-self:center">Label more</a></form>
-<p class=mute>Weather: Open-Meteo (CC BY 4.0). Your labels, schedule and this page stay on this computer.</p>
+<p class=mute>Built with PriorLabs-TabPFN · Gemma 4 via Ollama · Weather data by <a href="https://open-meteo.com">Open-Meteo.com</a> (CC BY 4.0). Your labels, schedule and this page stay on this computer.</p>
 </main></body></html>"""
 
 if __name__ == "__main__":

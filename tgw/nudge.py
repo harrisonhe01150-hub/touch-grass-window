@@ -1,7 +1,7 @@
-"""Gemma, running locally through Ollama, turns the numbers into one short nudge. Nothing leaves the laptop.
+"""Gemma, running locally through Ollama, turns the numbers into one short nudge. Nothing leaves your computer.
 
 All the reasoning (which window, which spot, what changes later in the week) happens in code first; the small model
-only has to phrase a handful of facts. That keeps it honest and keeps it fast on a laptop.
+only has to phrase a handful of facts. That keeps it honest and keeps it fast on ordinary hardware.
 """
 import json
 import re
